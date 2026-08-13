@@ -31,7 +31,7 @@
   <link href="css/responsive.css" rel="stylesheet" />
 
   <style>
-    /* Styling additions for plus/minus buttons and cart integration */
+    /* Styling additions for plus/minus buttons and cart modal/dropdown */
     .quantity-controller {
       display: flex;
       align-items: center;
@@ -51,6 +51,98 @@
     .quantity-controller span {
       font-size: 16px;
       font-weight: bold;
+    }
+
+    /* Cart Modal Styles */
+    .cart-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .cart-modal-content {
+      background-color: #fefefe;
+      margin: 10% auto;
+      padding: 25px;
+      border: 1px solid #888;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 10px;
+      position: relative;
+    }
+    .close-cart {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close-cart:hover,
+    .close-cart:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .cart-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .cart-item-details {
+      flex-grow: 1;
+    }
+    .cart-item-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cart-item-controls button {
+      background: #ffbe33;
+      color: #fff;
+      border: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .remove-item-btn {
+      background: #ff4d4d !important;
+      margin-left: 10px;
+    }
+    .cart-total-section {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .checkout-whatsapp-btn {
+      background-color: #25d366;
+      color: white;
+      border: none;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .checkout-whatsapp-btn:hover {
+      background-color: #1ebe5d;
     }
   </style>
 </head>
@@ -514,6 +606,24 @@
 
   <!-- end food section -->
 
+  <!-- Cart Modal Popup -->
+  <div id="cartModal" class="cart-modal">
+    <div class="cart-modal-content">
+      <span class="close-cart">&times;</span>
+      <h2>Your Basket</h2>
+      <div id="cartModalItems" style="margin-top: 20px; max-height: 250px; overflow-y: auto;">
+        <!-- Dynamic cart contents will appear here -->
+      </div>
+      <div class="cart-total-section">
+        <span>Total:</span>
+        <span id="cartModalTotal">Ksh 0</span>
+      </div>
+      <button type="button" class="checkout-whatsapp-btn" id="checkoutWhatsappBtn">
+        <i class="fa fa-whatsapp" aria-hidden="true"></i> Proceed to WhatsApp Order
+      </button>
+    </div>
+  </div>
+
   <!-- about section -->
 
   <section class="about_section layout_padding">
@@ -695,10 +805,9 @@
   </script>
   <!-- End Google Map -->
 
-  <!-- WhatsApp Cart & Isotope Filter Fix Script -->
+  <!-- WhatsApp Cart & Interactive Modal Script -->
   <script>
     const whatsappNumber = "+1234567890"; // Update with your telephone number if needed
-
     const cart = {};
 
     function updateCartUI() {
@@ -709,6 +818,54 @@
       $('#cart-count').text(totalCount);
     }
 
+    function renderCartModal() {
+      let modalItemsHtml = "";
+      let totalAmount = 0;
+      let hasItems = false;
+
+      for (let name in cart) {
+        if (cart[name].qty > 0) {
+          hasItems = true;
+          let itemTotal = cart[name].price * cart[name].qty;
+          totalAmount += itemTotal;
+          
+          modalItemsHtml += `
+            <div class="cart-item-row">
+              <div class="cart-item-details">
+                <strong>${name}</strong><br>
+                <small>Ksh ${cart[name].price.toLocaleString()} x ${cart[name].qty} = <strong>Ksh ${itemTotal.toLocaleString()}</strong></small>
+              </div>
+              <div class="cart-item-controls">
+                <button type="button" class="modal-minus-btn" data-name="${name}">-</button>
+                <span>${cart[name].qty}</span>
+                <button type="button" class="modal-plus-btn" data-name="${name}">+</button>
+                <button type="button" class="remove-item-btn" data-name="${name}" title="Remove item"><i class="fa fa-trash"></i></button>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      if (!hasItems) {
+        modalItemsHtml = `<p style="text-align: center; color: #777; margin: 20px 0;">Your basket is currently empty.</p>`;
+      }
+
+      $('#cartModalItems').html(modalItemsHtml);
+      $('#cartModalTotal').text(`Ksh ${totalAmount.toLocaleString()}`);
+    }
+
+    // Sync menu quantities back to menu cards
+    function syncMenuCardDisplay(name) {
+      let qty = cart[name] ? cart[name].qty : 0;
+      $('.quantity-controller').each(function() {
+        let btnPlus = $(this).find('.plus-btn');
+        if (btnPlus.data('name') === name) {
+          $(this).find('.item-qty').text(qty);
+        }
+      });
+    }
+
+    // Menu plus button click
     $('.plus-btn').click(function() {
       const name = $(this).data('name');
       const price = parseFloat($(this).data('price'));
@@ -718,10 +875,11 @@
       }
       cart[name].qty++;
       
-      $(this).siblings('.item-qty').text(cart[name].qty);
+      syncMenuCardDisplay(name);
       updateCartUI();
     });
 
+    // Menu minus button click
     $('.minus-btn').click(function() {
       const name = $(this).data('name');
       
@@ -732,14 +890,66 @@
         }
       }
       
-      const qty = cart[name] ? cart[name].qty : 0;
-      $(this).siblings('.item-qty').text(qty);
+      syncMenuCardDisplay(name);
       updateCartUI();
     });
 
+    // Open Cart Modal when basket icon is clicked
     $('#cartButton').click(function(e) {
       e.preventDefault();
+      renderCartModal();
+      $('#cartModal').fadeIn();
       
+      // Close mobile navigation menu if open (fixes hamburger overlay behavior)
+      $('.navbar-collapse').removeClass('show');
+    });
+
+    // Close Cart Modal
+    $('.close-cart').click(function() {
+      $('#cartModal').fadeOut();
+    });
+
+    $(window).click(function(e) {
+      if ($(e.target).is('#cartModal')) {
+        $('#cartModal').fadeOut();
+      }
+    });
+
+    // Modal internal plus button
+    $(document).on('click', '.modal-plus-btn', function() {
+      const name = $(this).data('name');
+      if (cart[name]) {
+        cart[name].qty++;
+        renderCartModal();
+        syncMenuCardDisplay(name);
+        updateCartUI();
+      }
+    });
+
+    // Modal internal minus button
+    $(document).on('click', '.modal-minus-btn', function() {
+      const name = $(this).data('name');
+      if (cart[name] && cart[name].qty > 1) {
+        cart[name].qty--;
+      } else if (cart[name] && cart[name].qty === 1) {
+        delete cart[name];
+      }
+      renderCartModal();
+      syncMenuCardDisplay(name);
+      updateCartUI();
+    });
+
+    // Remove item completely button
+    $(document).on('click', '.remove-item-btn', function() {
+      const name = $(this).data('name');
+      delete cart[name];
+      renderCartModal();
+      syncMenuCardDisplay(name);
+      updateCartUI();
+    });
+
+    // Checkout via WhatsApp from Modal
+    $('#checkoutWhatsappBtn').click(function() {
       let orderItemsText = "";
       let totalAmount = 0;
       let hasItems = false;
@@ -754,7 +964,7 @@
       }
 
       if (!hasItems) {
-        alert("Your cart is empty! Please add some items using the plus buttons.");
+        alert("Your basket is empty! Please add some items first.");
         return;
       }
 
@@ -762,10 +972,11 @@
       let encodedMessage = encodeURIComponent(message);
       let whatsappURL = `https://wa.me/${447749452288}?text=${encodedMessage}`;
       
+      $('#cartModal').fadeOut();
       window.open(whatsappURL, '_blank');
     });
 
-    // Re-trigger Isotope layout initialization so clicking filter buttons (Burger, Pizza, etc.) works dynamically
+    // Re-trigger Isotope layout initialization so clicking filter buttons works dynamically
     $(window).on('load', function () {
       var $grid = $('.grid').isotope({
         itemSelector: '.all',
